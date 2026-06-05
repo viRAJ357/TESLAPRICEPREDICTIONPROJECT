@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from tensorflow.keras.models import load_model
-import pickle
+from sklearn.preprocessing import MinMaxScaler
 
 # --- Page Configuration ---
 st.set_page_config(page_title="Tesla Stock Predictor", page_icon="📈", layout="wide")
@@ -54,31 +54,38 @@ st.markdown("""
 st.markdown('<p class="main-title">Tesla Stock Price Predictor</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-title">Deep Learning Forecasting using LSTM & SimpleRNN</p>', unsafe_allow_html=True)
 
-# --- Caching Data & Models ---
+# --- Caching Models ---
 @st.cache_resource
-def load_models_and_scaler():
+def load_models():
     try:
         lstm = load_model('lstm_model.h5')
         rnn = load_model('rnn_model.h5')
-        with open('scaler.pkl', 'rb') as f:
-            scaler = pickle.load(f)
-        return lstm, rnn, scaler
+        return lstm, rnn
     except Exception as e:
-        st.error(f"Error loading models/scaler. Make sure lstm_model.h5, rnn_model.h5, and scaler.pkl are in the folder. Details: {e}")
-        return None, None, None
+        st.error(f"Error loading models. Make sure lstm_model.h5 and rnn_model.h5 are in the folder. Details: {e}")
+        return None, None
 
 @st.cache_data
-def load_data():
-    df = pd.read_csv('TSLA.csv')
-    df['Date'] = pd.to_datetime(df['Date'])
-    df.set_index('Date', inplace=True)
-    return df
+def load_data_and_scaler():
+    try:
+        df = pd.read_csv('TSLA.csv')
+        df['Date'] = pd.to_datetime(df['Date'])
+        df.set_index('Date', inplace=True)
+        
+        # Dynamically fit the scaler to avoid Pickle version issues on Cloud
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        scaler.fit(df[['Adj Close']])
+        
+        return df, scaler
+    except Exception as e:
+        st.error(f"Error loading data. Details: {e}")
+        return None, None
 
 # Load Assets
-lstm_model, rnn_model, scaler = load_models_and_scaler()
-data = load_data()
+lstm_model, rnn_model = load_models()
+data, scaler = load_data_and_scaler()
 
-if lstm_model and rnn_model and scaler and data is not None:
+if lstm_model and rnn_model and data is not None and scaler is not None:
     
     # --- Sidebar Configuration ---
     st.sidebar.header("⚙️ Configuration")
